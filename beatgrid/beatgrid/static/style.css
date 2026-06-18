@@ -41,6 +41,12 @@ footer {
 .help { color: var(--muted); font-size: 13px; }
 .resultcard { width: 100%; max-width: 460px; border-radius: 12px; margin: 12px auto;
   display: block; box-shadow: 0 10px 50px rgba(0,0,0,.6); }
+.diff-row { display: flex; gap: 8px; justify-content: center; margin: 10px 0 14px; }
+.diff { cursor: pointer; padding: 8px 16px; border-radius: 8px; font-weight: 700;
+  letter-spacing: 1px; background: transparent; color: var(--muted);
+  border: 1px solid rgba(0,234,255,.3); }
+.diff.on { color: #0b0420; background: linear-gradient(90deg, var(--cyan), var(--pink)); border: 0; }
+.streak { color: var(--yellow); font-weight: 800; letter-spacing: 1px; margin: 6px 0; }
 .crosssell { margin-top: 14px; font-size: 14px; color: var(--muted); }
 .crosssell a { color: var(--cyan); text-decoration: none; }
 

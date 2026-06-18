@@ -105,33 +105,68 @@ const BEATGRID = (function () {
   const LANE_KEYS = { KeyD: 0, KeyF: 1, KeyJ: 2, KeyK: 3 };
   const LANE_COLORS = ["#00eaff", "#ff2db5", "#39ff88", "#ffd23f"];
   const LANE_LABELS = ["D", "F", "J", "K"];
-  const TRAVEL = 1.9; // seconds a note is visible before the hit line
+  const TRAVEL = 1.9; // seconds a note is visible before the hit line (Normal)
+
+  // Difficulty changes note speed and timing windows only, never the chart,
+  // so the music stays fully intact across modes.
+  const DIFF = {
+    Easy:   { travel: 2.5, perfect: 0.09, good: 0.16, window: 0.22, mult: 0.8 },
+    Normal: { travel: 1.9, perfect: 0.06, good: 0.12, window: 0.18, mult: 1.0 },
+    Hard:   { travel: 1.3, perfect: 0.045, good: 0.09, window: 0.14, mult: 1.3 },
+  };
+
+  // Daily streak, tracked locally. Increments once per consecutive day played.
+  function bumpStreak(day) {
+    if (!day) return parseInt(localStorage.getItem("bg_streak") || "0", 10);
+    const last = parseInt(localStorage.getItem("bg_last_day") || "-999", 10);
+    let streak = parseInt(localStorage.getItem("bg_streak") || "0", 10);
+    if (last === day) { /* already counted today */ }
+    else if (last === day - 1) { streak += 1; }
+    else { streak = 1; }
+    localStorage.setItem("bg_last_day", String(day));
+    localStorage.setItem("bg_streak", String(streak));
+    return streak;
+  }
+  function currentStreak() {
+    return parseInt(localStorage.getItem("bg_streak") || "0", 10);
+  }
 
   function initGame(d, mountId) {
     const mount = document.getElementById(mountId);
-    mount.innerHTML = "";
+    const ranked = d.ranked !== false;
     const meta = document.getElementById("track-meta");
     if (meta) meta.textContent =
       `${d.track_name} · ${d.bpm} BPM · from "${d.pack_name}"`;
-
     const cs = document.getElementById("crosssell");
     if (cs) cs.innerHTML =
       `Like this beat? <a href="/shop/${d.pack_id}">Get “${d.pack_name}” in the Sound Shop →</a>`;
 
-    const start = document.createElement("button");
-    start.className = "btn big";
-    start.textContent = d.ranked === false ? `▶ Play ${d.track_name}` : "▶ Play today's beat";
-    mount.appendChild(start);
+    const savedDiff = localStorage.getItem("bg_diff") || "Normal";
+    const streakLine = (ranked && currentStreak() > 0)
+      ? `<p class="streak">🔥 ${currentStreak()} day streak</p>` : "";
+    const startLabel = ranked ? "▶ Play today's beat" : `▶ Play ${d.track_name}`;
+    mount.innerHTML = `
+      ${streakLine}
+      <div class="diff-row">
+        ${["Easy", "Normal", "Hard"].map((k) =>
+          `<button class="diff ${k === savedDiff ? "on" : ""}" data-diff="${k}">${k}</button>`).join("")}
+      </div>
+      <button class="btn big" id="startbtn">${startLabel}</button>
+      <p class="help">Hit D F J K (or tap the lanes) when notes reach the line.</p>`;
 
-    const help = document.createElement("p");
-    help.className = "help";
-    help.textContent = "Hit D F J K (or tap the lanes) when notes reach the line.";
-    mount.appendChild(help);
-
-    start.addEventListener("click", () => run(d, mount));
+    let diff = savedDiff;
+    mount.querySelectorAll(".diff").forEach((b) => {
+      b.onclick = () => {
+        diff = b.dataset.diff;
+        localStorage.setItem("bg_diff", diff);
+        mount.querySelectorAll(".diff").forEach((x) => x.classList.toggle("on", x === b));
+      };
+    });
+    document.getElementById("startbtn").onclick = () => run(d, mount, DIFF[diff] || DIFF.Normal);
   }
 
-  function run(d, mount) {
+  function run(d, mount, diff) {
+    diff = diff || DIFF.Normal;
     mount.innerHTML = "";
     const canvas = document.createElement("canvas");
     const W = Math.min(mount.clientWidth || 480, 480), H = 560;
@@ -144,7 +179,7 @@ const BEATGRID = (function () {
     const { events, duration, sd } = buildEvents(d);
     events.forEach(e => { e.judged = false; });
 
-    let score = 0, combo = 0, maxCombo = 0;
+    let score = 0, qual = 0, combo = 0, maxCombo = 0;
     const counts = { Perfect: 0, Good: 0, Ok: 0, Miss: 0 };
     const flashes = [0, 0, 0, 0];
     const judgements = [];
@@ -163,12 +198,12 @@ const BEATGRID = (function () {
         const diff = Math.abs(e.time - now);
         if (diff < bestDiff) { bestDiff = diff; best = e; }
       }
-      if (!best || bestDiff > 0.18) return;
+      if (!best || bestDiff > diff.window) return;
       best.judged = true;
       let label;
-      if (bestDiff <= 0.06) { score += 100; combo++; counts.Perfect++; label = "Perfect"; }
-      else if (bestDiff <= 0.12) { score += 60; combo++; counts.Good++; label = "Good"; }
-      else { score += 30; combo++; counts.Ok++; label = "Ok"; }
+      if (bestDiff <= diff.perfect) { score += Math.round(100 * diff.mult); qual += 100; combo++; counts.Perfect++; label = "Perfect"; }
+      else if (bestDiff <= diff.good) { score += Math.round(60 * diff.mult); qual += 60; combo++; counts.Good++; label = "Good"; }
+      else { score += Math.round(30 * diff.mult); qual += 30; combo++; counts.Ok++; label = "Ok"; }
       maxCombo = Math.max(maxCombo, combo);
       judgements.push(label);
       flashes[lane] = 1;
@@ -191,7 +226,7 @@ const BEATGRID = (function () {
       const now = songTime();
       // expire missed notes
       for (const e of events) {
-        if (!e.judged && e.time < now - 0.18) {
+        if (!e.judged && e.time < now - diff.window) {
           e.judged = true; counts.Miss++; combo = 0;
           judgements.push("Miss");
         }
@@ -222,8 +257,8 @@ const BEATGRID = (function () {
       for (const e of events) {
         if (e.judged) continue;
         const dt = e.time - now;
-        if (dt > TRAVEL || dt < -0.2) continue;
-        const y = hitY - (dt / TRAVEL) * hitY;
+        if (dt > diff.travel || dt < -0.2) continue;
+        const y = hitY - (dt / diff.travel) * hitY;
         g.fillStyle = LANE_COLORS[e.lane];
         const x = e.lane * laneW + 8;
         g.fillRect(x, y - 9, laneW - 16, 18);
@@ -245,10 +280,11 @@ const BEATGRID = (function () {
 
     function end() {
       const total = events.length;
-      const acc = total ? Math.round((score / (total * 100)) * 100) : 0;
+      const acc = total ? Math.round((qual / (total * 100)) * 100) : 0;
       const grade = acc >= 95 ? "S" : acc >= 85 ? "A" : acc >= 70 ? "B" : acc >= 50 ? "C" : "D";
       const share = shareText(d, score, acc, maxCombo, grade, judgements);
       const ranked = d.ranked !== false;
+      const streak = ranked ? bumpStreak(d.day) : 0;
       const saved = (localStorage.getItem("bg_initials") || "AAA").toUpperCase();
       const qs = `grade=${grade}&score=${score}&acc=${acc}&combo=${maxCombo}` +
         `&initials=${encodeURIComponent(saved)}&day=${d.day}` +
@@ -267,6 +303,7 @@ const BEATGRID = (function () {
           <h2>${acc}% accuracy</h2>
           <p class="sub">Score ${score} · Max combo ${maxCombo}</p>
           <p class="counts">Perfect ${counts.Perfect} · Good ${counts.Good} · Ok ${counts.Ok} · Miss ${counts.Miss}</p>
+          ${ranked && streak ? `<p class="streak">🔥 ${streak} day streak</p>` : ""}
           ${rankedBlock}
           <pre class="share" id="share">${share}</pre>
           <div class="actions">
@@ -277,7 +314,7 @@ const BEATGRID = (function () {
           </div>
         </div>`;
 
-      document.getElementById("again").onclick = () => run(d, mount);
+      document.getElementById("again").onclick = () => run(d, mount, diff);
       document.getElementById("copylink").onclick = () => {
         navigator.clipboard && navigator.clipboard.writeText(resultUrl);
         document.getElementById("copylink").textContent = "Link copied!";
