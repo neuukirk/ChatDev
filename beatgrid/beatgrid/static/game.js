@@ -248,24 +248,78 @@ const BEATGRID = (function () {
       const acc = total ? Math.round((score / (total * 100)) * 100) : 0;
       const grade = acc >= 95 ? "S" : acc >= 85 ? "A" : acc >= 70 ? "B" : acc >= 50 ? "C" : "D";
       const share = shareText(d, score, acc, maxCombo, grade, judgements);
+      const saved = (localStorage.getItem("bg_initials") || "AAA").toUpperCase();
+      const cardUrl = `/share-card.png?grade=${grade}&score=${score}&acc=${acc}` +
+        `&combo=${maxCombo}&initials=${encodeURIComponent(saved)}&day=${d.day}` +
+        `&track=${encodeURIComponent(d.track_name)}`;
       mount.innerHTML = `
         <div class="result">
           <div class="grade grade-${grade}">${grade}</div>
           <h2>${acc}% accuracy</h2>
           <p class="sub">Score ${score} · Max combo ${maxCombo}</p>
           <p class="counts">Perfect ${counts.Perfect} · Good ${counts.Good} · Ok ${counts.Ok} · Miss ${counts.Miss}</p>
+          <div class="submit-row">
+            <input id="initials" maxlength="3" value="${saved}" placeholder="AAA">
+            <button class="btn" id="submit">Submit score</button>
+          </div>
+          <div id="board"></div>
           <pre class="share" id="share">${share}</pre>
           <div class="actions">
-            <button class="btn" id="copy">Copy result</button>
+            <a class="btn" href="${cardUrl}" download="beatgrid-${d.day}.png">Download share card</a>
+            <button class="btn ghost" id="copy">Copy text</button>
             <button class="btn ghost" id="again">Play again</button>
             <a class="btn ghost" href="/shop/${d.pack_id}">Get the pack</a>
           </div>
         </div>`;
+
+      const initEl = document.getElementById("initials");
+      initEl.addEventListener("input", () => {
+        initEl.value = initEl.value.replace(/[^A-Za-z]/g, "").toUpperCase().slice(0, 3);
+      });
       document.getElementById("again").onclick = () => run(d, mount);
       document.getElementById("copy").onclick = () => {
         navigator.clipboard && navigator.clipboard.writeText(share);
         document.getElementById("copy").textContent = "Copied!";
       };
+      document.getElementById("submit").onclick = async () => {
+        const initials = (initEl.value || "AAA").toUpperCase();
+        localStorage.setItem("bg_initials", initials);
+        try {
+          const res = await fetch("/api/score", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ initials, score, accuracy: acc, combo: maxCombo, grade }),
+          });
+          const data = await res.json();
+          renderBoard(data.leaderboard, data.rank, data.players);
+        } catch (e) { /* offline: leave board empty */ }
+      };
+      loadBoard();
+    }
+
+    async function loadBoard() {
+      try {
+        const res = await fetch("/api/leaderboard");
+        const data = await res.json();
+        renderBoard(data.leaderboard, null, data.players);
+      } catch (e) { /* ignore */ }
+    }
+
+    function renderBoard(list, rank, players) {
+      const board = document.getElementById("board");
+      if (!board) return;
+      if (!list || !list.length) {
+        board.innerHTML = `<p class="counts">Be the first on today's board.</p>`;
+        return;
+      }
+      const rows = list.map((r, i) =>
+        `<li><span class="pos">${i + 1}</span><span class="ini">${r.initials}</span>` +
+        `<span class="sc">${r.score}</span><span class="gr grade-${r.grade}">${r.grade}</span></li>`
+      ).join("");
+      board.innerHTML =
+        `<h3 class="board-title">Today's Top Players${players ? " · " + players + " played" : ""}</h3>` +
+        `<ol class="board">${rows}</ol>` +
+        (rank ? `<p class="rank">Your rank: #${rank}</p>` : "");
     }
 
     requestAnimationFrame(frame);

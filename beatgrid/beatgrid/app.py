@@ -23,12 +23,14 @@ from flask import (
     jsonify,
     redirect,
     render_template_string,
+    request,
     url_for,
 )
 
-from . import catalog, daily
+from . import catalog, daily, sharecard, store
 
 app = Flask(__name__)
+store.init_db()
 
 # In-memory purchases. A real build swaps this for a DB + Stripe webhooks.
 PURCHASED: set = set()
@@ -124,6 +126,54 @@ def home():
 @app.route("/api/daily")
 def api_daily():
     return jsonify(daily.daily_payload())
+
+
+@app.route("/api/score", methods=["POST"])
+def api_score():
+    body = request.get_json(silent=True) or {}
+    today = daily.daily_payload()
+    try:
+        result = store.add_score(
+            day=today["day"],
+            date=today["date"],
+            initials=str(body.get("initials", "AAA")),
+            score=int(body.get("score", 0)),
+            accuracy=int(body.get("accuracy", 0)),
+            combo=int(body.get("combo", 0)),
+            grade=str(body.get("grade", "D")),
+        )
+    except (TypeError, ValueError):
+        return Response("Invalid score payload.", status=400)
+    result["leaderboard"] = store.top_scores(today["day"])
+    return jsonify(result)
+
+
+@app.route("/api/leaderboard")
+def api_leaderboard():
+    today = daily.daily_payload()
+    return jsonify({
+        "day": today["day"],
+        "players": store.player_count(today["day"]),
+        "leaderboard": store.top_scores(today["day"]),
+    })
+
+
+@app.route("/share-card.png")
+def share_card():
+    a = request.args
+    try:
+        png = sharecard.render_png(
+            grade=a.get("grade", "D"),
+            score=max(0, min(int(a.get("score", 0)), 9_999_999)),
+            accuracy=max(0, min(int(a.get("acc", 0)), 100)),
+            combo=max(0, min(int(a.get("combo", 0)), 99_999)),
+            initials=a.get("initials", "AAA"),
+            track=a.get("track", ""),
+            day=max(0, min(int(a.get("day", 0)), 99_999)),
+        )
+    except (TypeError, ValueError):
+        return Response("Invalid card params.", status=400)
+    return Response(png, mimetype="image/png")
 
 
 @app.route("/shop")

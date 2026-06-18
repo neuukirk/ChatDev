@@ -4,11 +4,17 @@ import datetime
 import json
 import os
 import sys
+import tempfile
 import unittest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from beatgrid import catalog, daily  # noqa: E402
+# Use an isolated DB for tests before importing anything that touches the store.
+_TMP_DB = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+_TMP_DB.close()
+os.environ["BEATGRID_DB"] = _TMP_DB.name
+
+from beatgrid import catalog, daily, store  # noqa: E402
 
 
 class CatalogTests(unittest.TestCase):
@@ -51,6 +57,9 @@ class WebTests(unittest.TestCase):
         from beatgrid.app import app, PURCHASED
         app.config["TESTING"] = True
         PURCHASED.clear()
+        store.init_db()
+        with store._conn() as conn:  # isolate each test's leaderboard
+            conn.execute("DELETE FROM scores")
         self.client = app.test_client()
 
     def test_home_and_assets(self):
@@ -74,6 +83,36 @@ class WebTests(unittest.TestCase):
         r = self.client.get("/download/midnight-drive")
         self.assertEqual(r.status_code, 200)
         self.assertEqual(json.loads(r.data)["id"], "midnight-drive")
+
+    def test_score_submit_and_leaderboard(self):
+        r = self.client.post("/api/score", json={
+            "initials": "axn!", "score": 5000, "accuracy": 88, "combo": 40, "grade": "A",
+        })
+        self.assertEqual(r.status_code, 200)
+        data = r.get_json()
+        self.assertEqual(data["rank"], 1)
+        self.assertEqual(data["leaderboard"][0]["initials"], "AXN")  # sanitized, uppercased
+        lb = self.client.get("/api/leaderboard").get_json()
+        self.assertGreaterEqual(lb["players"], 1)
+
+    def test_higher_score_ranks_first(self):
+        self.client.post("/api/score", json={"initials": "LOW", "score": 10,
+                                             "accuracy": 10, "combo": 1, "grade": "D"})
+        r = self.client.post("/api/score", json={"initials": "TOP", "score": 9000,
+                                                 "accuracy": 99, "combo": 99, "grade": "S"})
+        self.assertEqual(r.get_json()["leaderboard"][0]["initials"], "TOP")
+
+    def test_share_card_png(self):
+        r = self.client.get("/share-card.png?grade=S&score=8000&acc=97&combo=80&initials=AXN&day=12&track=Neon")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.mimetype, "image/png")
+        self.assertEqual(r.data[:8], b"\x89PNG\r\n\x1a\n")
+
+
+class StoreTests(unittest.TestCase):
+    def test_initials_sanitized(self):
+        self.assertEqual(store.clean_initials("a1b2c3d"), "ABC")
+        self.assertEqual(store.clean_initials(""), "AAA")
 
 
 if __name__ == "__main__":
