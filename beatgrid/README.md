@@ -11,8 +11,10 @@ Part of the Old Body Style Arcade. This is the v1 prototype.
 ## The idea
 
 - **Play (free, viral):** a new rhythm challenge every day, the same for
-  everyone (Wordle cadence), with a shareable result. The chart is generated
-  from the date, so a fresh game appears daily with no manual work.
+  everyone (Wordle cadence). The chart is generated from the date, so a fresh
+  game appears daily with no manual work.
+- **Compete + share (growth loop):** classic 3-letter arcade initials on a daily
+  leaderboard, plus a generated synthwave **share-card image** to post.
 - **Sound Shop (the money):** original retro track packs sold as digital goods.
   Free in-browser previews, paid unlock of the full downloadable pack.
 - **The wire between them:** today's beat comes from a real pack, and the game
@@ -61,11 +63,13 @@ beatgrid/
   beatgrid/
     catalog.py        # the sound catalog (packs + tracks/patterns)
     daily.py          # deterministic daily selection from the date
-    app.py            # Flask app: game + shop + purchase gate
+    store.py          # SQLite daily leaderboard
+    sharecard.py      # synthwave result-card PNG (Pillow)
+    app.py            # Flask app: game + shop + leaderboard + share card
     static/
       game.js         # Web Audio synth + 4-lane rhythm game + shop preview
       style.css       # synthwave UI
-  tests/              # catalog, daily-determinism, and web-flow tests
+  tests/              # catalog, daily, leaderboard, share-card, web-flow tests
   requirements.txt
 ```
 
@@ -80,7 +84,7 @@ python -m unittest discover
 
 ## What the v1 proves
 
-A playable, shareable daily game and a working storefront that cross-sells from
-the game, all from one shared engine. The next steps are real checkout (Stripe),
-a leaderboard, a daily auto-post to social, and growing the pack catalog (the
-content the whole flywheel runs on).
+A playable daily game with a leaderboard and a shareable result card, plus a
+working storefront that cross-sells from the game, all from one shared engine.
+The next steps are real checkout (Stripe), a daily auto-post to social, and
+growing the pack catalog (the content the whole flywheel runs on).
