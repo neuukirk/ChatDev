@@ -108,6 +108,27 @@ class WebTests(unittest.TestCase):
         self.assertEqual(r.mimetype, "image/png")
         self.assertEqual(r.data[:8], b"\x89PNG\r\n\x1a\n")
 
+    def test_og_default_png(self):
+        r = self.client.get("/og.png")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.data[:8], b"\x89PNG\r\n\x1a\n")
+
+    def test_arcade_lists_catalog(self):
+        r = self.client.get("/arcade")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"BEATGRID_CATALOG", r.data)
+        self.assertIn(b"arcade-play", r.data)
+
+    def test_result_has_og_card(self):
+        r = self.client.get("/result?grade=A&score=5000&acc=88&combo=40&initials=AXN&day=12&track=Neon")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b'property="og:image"', r.data)
+        self.assertIn(b"/share-card.png", r.data)
+
+    def test_home_has_og_tags(self):
+        r = self.client.get("/")
+        self.assertIn(b'property="og:image"', r.data)
+
 
 class StoreTests(unittest.TestCase):
     def test_initials_sanitized(self):

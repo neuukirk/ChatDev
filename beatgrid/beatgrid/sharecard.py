@@ -54,13 +54,12 @@ def _text_center(draw, cx, y, text, font, fill):
     draw.text((cx - w // 2, y), text, font=font, fill=fill)
 
 
-def render_card(grade: str, score: int, accuracy: int, combo: int,
-                initials: str, track: str = "", day: int = 0) -> Image.Image:
+def _scene() -> Tuple[Image.Image, ImageDraw.ImageDraw, int]:
+    """The shared synthwave backdrop: sky, ground, perspective grid, sun."""
     w, h = SIZE
     horizon = int(h * 0.46)
     img = Image.new("RGB", SIZE)
 
-    # Sky + ground.
     strip = Image.new("RGB", (1, horizon))
     for y in range(horizon):
         strip.putpixel((0, y), _lerp(BG_TOP, BG_HORIZON, y / max(1, horizon - 1)))
@@ -72,7 +71,6 @@ def render_card(grade: str, score: int, accuracy: int, combo: int,
 
     draw = ImageDraw.Draw(img)
 
-    # Perspective grid on the ground.
     vp = (w // 2, horizon)
     for x in range(-w, 2 * w + 1, 80):
         draw.line([(x, h), vp], fill=(0, 234, 255), width=1)
@@ -82,7 +80,6 @@ def render_card(grade: str, score: int, accuracy: int, combo: int,
         y = int(horizon + (h - horizon) * (t * t))
         draw.line([(0, y), (w, y)], fill=(0, 180, 220), width=1)
 
-    # Sun.
     d = int(w * 0.34)
     sun = Image.new("RGBA", (d, d), (0, 0, 0, 0))
     sg = Image.new("RGB", (1, d))
@@ -92,6 +89,13 @@ def render_card(grade: str, score: int, accuracy: int, combo: int,
     ImageDraw.Draw(mask).ellipse((0, 0, d - 1, d - 1), fill=255)
     sun.paste(sg.resize((d, d)), (0, 0), mask)
     img.paste(sun, ((w - d) // 2, horizon - int(d * 0.72)), sun)
+    return img, draw, horizon
+
+
+def render_card(grade: str, score: int, accuracy: int, combo: int,
+                initials: str, track: str = "", day: int = 0) -> Image.Image:
+    w, h = SIZE
+    img, draw, horizon = _scene()
 
     # Branding.
     _text_center(draw, w // 2, 48, "BEATGRID", _font(64), CYAN)
@@ -127,4 +131,23 @@ def render_card(grade: str, score: int, accuracy: int, combo: int,
 def render_png(**kwargs) -> bytes:
     buf = io.BytesIO()
     render_card(**kwargs).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def render_promo() -> Image.Image:
+    """A branded card used as the default social link preview."""
+    w, h = SIZE
+    img, draw, horizon = _scene()
+    _text_center(draw, w // 2, 60, "BEATGRID", _font(120), CYAN)
+    _text_center(draw, w // 2, 210, "A NEW BEAT EVERY DAY", _font(44), TEXT)
+    _text_center(draw, w // 2, h - 320, "DAILY RETRO RHYTHM GAME", _font(40), YELLOW)
+    _text_center(draw, w // 2, h - 240, "Play today's challenge.", _font(46), TEXT)
+    _text_center(draw, w // 2, h - 150, "Beat the leaderboard. Share your score.", _font(34), PINK)
+    draw.rectangle([10, 10, w - 11, h - 11], outline=PINK, width=5)
+    return img
+
+
+def render_promo_png() -> bytes:
+    buf = io.BytesIO()
+    render_promo().save(buf, format="PNG")
     return buf.getvalue()

@@ -39,10 +39,16 @@ PAGE = """
 <!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ title }} — BEATGRID</title>
+<meta property="og:title" content="{{ og_title }}">
+<meta property="og:description" content="{{ og_desc }}">
+<meta property="og:image" content="{{ og_image }}">
+<meta property="og:url" content="{{ og_url }}">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head><body>
 <header><a class="logo" href="{{ url_for('home') }}">BEAT<span>GRID</span></a>
-<nav><a href="{{ url_for('home') }}">Play</a><a href="{{ url_for('shop') }}">Sound Shop</a></nav>
+<nav><a href="{{ url_for('home') }}">Play</a><a href="{{ url_for('arcade') }}">Arcade</a><a href="{{ url_for('shop') }}">Sound Shop</a></nav>
 </header>
 <main>{{ body|safe }}</main>
 <footer>A new beat every day. Original retro-style audio. © Old Body Style Arcade.</footer>
@@ -111,10 +117,49 @@ PACK_BODY = """
 <script>BEATGRID.initPackPreview();</script>
 """
 
+ARCADE_BODY = """
+<section class="play">
+  <h1>Free Play Arcade</h1>
+  <p class="sub">Play any track in the catalog. (The daily leaderboard lives on the Play tab.)</p>
+  <div id="game"></div>
+  <div class="crosssell" id="crosssell"></div>
+  {% for pack in packs %}
+    <h3 class="board-title">{{ pack.name }}</h3>
+    <ul class="tracklist">
+    {% for t in pack.tracks %}
+      <li><button class="play-btn arcade-play" data-pack="{{ pack.id }}" data-track="{{ loop.index0 }}">▶</button>
+        <span>{{ t.name }}</span><span class="bpm">{{ t.bpm }} BPM</span></li>
+    {% endfor %}
+    </ul>
+  {% endfor %}
+</section>
+<script>window.BEATGRID_CATALOG = {{ catalog_json|safe }};</script>
+<script src="{{ url_for('static', filename='game.js') }}"></script>
+<script>BEATGRID.initArcade();</script>
+"""
 
-def _render(title, body, **ctx):
+RESULT_BODY = """
+<section class="play">
+  <h1>BEATGRID Result</h1>
+  <img class="resultcard" src="{{ card_url }}" alt="BEATGRID result card">
+  <div class="actions">
+    <a class="btn" href="{{ url_for('home') }}">Play today's beat</a>
+    <a class="btn ghost" href="{{ url_for('shop') }}">Sound Shop</a>
+  </div>
+</section>
+"""
+
+
+def _render(title, body, og=None, **ctx):
+    og = og or {}
     inner = render_template_string(body, **ctx)
-    return render_template_string(PAGE, title=title, body=inner)
+    return render_template_string(
+        PAGE, title=title, body=inner,
+        og_title=og.get("title", "BEATGRID — A new beat every day"),
+        og_desc=og.get("desc", "A daily retro rhythm game. Beat the leaderboard, share your score."),
+        og_image=og.get("image", url_for("og_default", _external=True)),
+        og_url=og.get("url", request.url),
+    )
 
 
 @app.route("/")
@@ -156,6 +201,34 @@ def api_leaderboard():
         "players": store.player_count(today["day"]),
         "leaderboard": store.top_scores(today["day"]),
     })
+
+
+@app.route("/og.png")
+def og_default():
+    return Response(sharecard.render_promo_png(), mimetype="image/png")
+
+
+@app.route("/arcade")
+def arcade():
+    payload = {"packs": catalog.PACKS, "root_hz": catalog.ROOT_HZ, "steps": catalog.STEPS}
+    return _render("Arcade", ARCADE_BODY, packs=catalog.PACKS,
+                   catalog_json=json.dumps(payload))
+
+
+@app.route("/result")
+def result():
+    a = request.args
+    keys = ("grade", "score", "acc", "combo", "initials", "day", "track")
+    params = {k: a.get(k) for k in keys if a.get(k) is not None}
+    card_url = url_for("share_card", _external=True, **params)
+    track_label = a.get("track") or "today's beat"
+    og = {
+        "title": f"BEATGRID #{a.get('day', '')} — {a.get('grade', '')} {a.get('acc', '')}%".strip(),
+        "desc": f"Score {a.get('score', '0')} on {track_label}. Can you beat it?",
+        "image": card_url,
+        "url": request.url,
+    }
+    return _render("Result", RESULT_BODY, og=og, card_url=card_url)
 
 
 @app.route("/share-card.png")

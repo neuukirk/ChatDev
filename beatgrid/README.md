@@ -14,7 +14,10 @@ Part of the Old Body Style Arcade. This is the v1 prototype.
   everyone (Wordle cadence). The chart is generated from the date, so a fresh
   game appears daily with no manual work.
 - **Compete + share (growth loop):** classic 3-letter arcade initials on a daily
-  leaderboard, plus a generated synthwave **share-card image** to post.
+  leaderboard, a generated synthwave **share-card image**, and **Open Graph link
+  previews** so a pasted result link auto-shows that card anywhere.
+- **Free-Play arcade:** play any track in the catalog, not just today's, which
+  boosts session time and puts more packs in front of players.
 - **Sound Shop (the money):** original retro track packs sold as digital goods.
   Free in-browser previews, paid unlock of the full downloadable pack.
 - **The wire between them:** today's beat comes from a real pack, and the game
@@ -84,7 +87,9 @@ python -m unittest discover
 
 ## What the v1 proves
 
-A playable daily game with a leaderboard and a shareable result card, plus a
-working storefront that cross-sells from the game, all from one shared engine.
-The next steps are real checkout (Stripe), a daily auto-post to social, and
-growing the pack catalog (the content the whole flywheel runs on).
+A playable daily game with a leaderboard, shareable result cards, link previews,
+and a free-play arcade, plus a working storefront that cross-sells from the game,
+all from one shared engine. The remaining steps need external accounts: real
+checkout (Stripe keys) and a daily auto-post (a social API). Drop in those
+credentials and they wire straight in. Until then, the product keeps getting
+deeper and the catalog keeps growing (the content the flywheel runs on).
