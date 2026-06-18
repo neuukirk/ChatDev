@@ -1,0 +1,12 @@
+{
+  "profile": "operator",
+  "name": "Austin Newkirk",
+  "role": "Partner Development Coordinator, Circle (Circle Alliance Program)",
+  "summary": "Internal systems-and-insights operator: diagnose structure, surface the signal, recommend the action, and build the system that reduces repeat friction.",
+  "how_you_work": "Sprint-style work over scattered asks; structured working spaces over Slack link drops; live review when possible; build in lead time for a skeptical second pass; fewer, sharper deliverables; systems over one-off fixes",
+  "principles": "Build repeatable systems over reactive fixes; Reduce noise and increase signal; Frame the decision, not just the dataset; Tie reporting to action and to goals; Separate raw activity from true intent; Keep human judgment in the loop where quality matters; Measure before scaling; Preserve clarity under visibility pressure",
+  "output_standard": "Lead with a one-sentence headline under 20 words; one idea per bullet; tie each output to a goal or OKR; end with a verb-first next step; no raw data dumps; no em dashes",
+  "goals": "Grow active member base; Drive USDC adoption and usage; Demonstrate commercial impact",
+  "tools": "Salesforce, Gong, Discord, Common Room, n8n, Google Workspace, Slack, Claude",
+  "projects": "Coaching, Discord, Partnerpage, General Operations"
+}
